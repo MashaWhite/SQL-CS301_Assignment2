@@ -1,0 +1,156 @@
+Було виконано запити, наведені в файлі script.sql
+
+1.При виконанні неоптимізованого скрипта Execution Time: 325.438 ms
+При виконанні оптимізованого:
+2. Execution Time: 191.522 ms
+При виконанні оптимізованого з set enable_seqscan = off;
+3. Execution Time: 238.824 ms
+
+Детальніше:
+1.
+Result  (cost=56625.87..56625.88 rows=1 width=64) (actual time=324.569..324.573 rows=1.00 loops=1)
+  Buffers: shared hit=18520
+  InitPlan 1
+    ->  Aggregate  (cost=28312.93..28312.94 rows=1 width=32) (actual time=185.651..185.653 rows=1.00 loops=1)
+          Buffers: shared hit=9260
+          ->  HashAggregate  (cost=27484.47..28105.81 rows=16569 width=42) (actual time=183.280..185.154 rows=36.00 loops=1)
+                Group Key: c.id
+                Filter: (min(o.order_date) >= '2025-01-01'::date)
+                Batches: 1  Memory Usage: 5145kB
+                Rows Removed by Filter: 49962
+                Buffers: shared hit=9260
+                ->  Hash Join  (cost=3778.34..23756.45 rows=497070 width=38) (actual time=25.884..138.425 rows=500086.00 loops=1)
+                      Hash Cond: (o.client_id = c.id)
+                      Buffers: shared hit=9260
+                      ->  Seq Scan on opt_orders o  (cost=0.00..17353.00 rows=1000000 width=24) (actual time=0.043..33.596 rows=1000000.00 loops=1)
+                            Buffers: shared hit=7353
+                      ->  Hash  (cost=3157.00..3157.00 rows=49707 width=30) (actual time=25.708..25.709 rows=49998.00 loops=1)
+                            Buckets: 65536  Batches: 1  Memory Usage: 3545kB
+                            Buffers: shared hit=1907
+                            ->  Seq Scan on opt_clients c  (cost=0.00..3157.00 rows=49707 width=30) (actual time=0.023..16.988 rows=49998.00 loops=1)
+                                  Filter: ((status)::text = 'active'::text)
+                                  Rows Removed by Filter: 50002
+                                  Buffers: shared hit=1907
+  InitPlan 2
+    ->  Aggregate  (cost=28312.93..28312.94 rows=1 width=32) (actual time=138.909..138.911 rows=1.00 loops=1)
+          Buffers: shared hit=9260
+          ->  HashAggregate  (cost=27484.47..28105.81 rows=16569 width=42) (actual time=138.908..138.909 rows=0.00 loops=1)
+                Group Key: c_1.id
+                Filter: (min(o_1.order_date) <= '2021-01-01'::date)
+                Batches: 1  Memory Usage: 5145kB
+                Rows Removed by Filter: 49998
+                Buffers: shared hit=9260
+                ->  Hash Join  (cost=3778.34..23756.45 rows=497070 width=38) (actual time=8.465..99.610 rows=500086.00 loops=1)
+                      Hash Cond: (o_1.client_id = c_1.id)
+                      Buffers: shared hit=9260
+                      ->  Seq Scan on opt_orders o_1  (cost=0.00..17353.00 rows=1000000 width=24) (actual time=0.010..20.454 rows=1000000.00 loops=1)
+                            Buffers: shared hit=7353
+                      ->  Hash  (cost=3157.00..3157.00 rows=49707 width=30) (actual time=8.424..8.424 rows=49998.00 loops=1)
+                            Buckets: 65536  Batches: 1  Memory Usage: 3545kB
+                            Buffers: shared hit=1907
+                            ->  Seq Scan on opt_clients c_1  (cost=0.00..3157.00 rows=49707 width=30) (actual time=0.005..5.492 rows=49998.00 loops=1)
+                                  Filter: ((status)::text = 'active'::text)
+                                  Rows Removed by Filter: 50002
+                                  Buffers: shared hit=1907
+Planning:
+  Buffers: shared hit=198 read=3
+Planning Time: 3.458 ms
+Execution Time: 325.438 ms
+
+
+2.
+Result  (cost=30234.09..30234.10 rows=1 width=64) (actual time=190.293..190.295 rows=1.00 loops=1)
+  Buffers: shared hit=9304
+  CTE active_clients
+    ->  HashAggregate  (cost=27417.33..27914.40 rows=49707 width=42) (actual time=180.706..183.569 rows=49998.00 loops=1)
+          Group Key: c.id
+          Batches: 1  Memory Usage: 5145kB
+          Buffers: shared hit=9304
+          ->  Hash Join  (cost=3711.20..23689.31 rows=497070 width=38) (actual time=24.068..133.813 rows=500086.00 loops=1)
+                Hash Cond: (o.client_id = c.id)
+                Buffers: shared hit=9304
+                ->  Seq Scan on opt_orders o  (cost=0.00..17353.00 rows=1000000 width=24) (actual time=0.012..23.407 rows=1000000.00 loops=1)
+                      Buffers: shared hit=7353
+                ->  Hash  (cost=3089.86..3089.86 rows=49707 width=30) (actual time=24.041..24.041 rows=49998.00 loops=1)
+                      Buckets: 65536  Batches: 1  Memory Usage: 3545kB
+                      Buffers: shared hit=1951
+                      ->  Bitmap Heap Scan on opt_clients c  (cost=561.52..3089.86 rows=49707 width=30) (actual time=3.076..13.871 rows=49998.00 loops=1)
+                            Recheck Cond: ((status)::text = 'active'::text)
+                            Heap Blocks: exact=1907
+                            Buffers: shared hit=1951
+                            ->  Bitmap Index Scan on inx_opt_clients_status  (cost=0.00..549.10 rows=49707 width=0) (actual time=2.623..2.623 rows=49998.00 loops=1)
+                                  Index Cond: ((status)::text = 'active'::text)
+                                  Index Searches: 1
+                                  Buffers: shared hit=44
+  InitPlan 2
+    ->  Aggregate  (cost=1159.83..1159.84 rows=1 width=32) (actual time=188.830..188.830 rows=1.00 loops=1)
+          Buffers: shared hit=9304
+          ->  CTE Scan on active_clients  (cost=0.00..1118.41 rows=16569 width=8) (actual time=180.851..188.825 rows=36.00 loops=1)
+                Filter: (first_order_date >= '2025-01-01'::date)
+                Rows Removed by Filter: 49962
+                Storage: Memory  Maximum Storage: 3971kB
+                Buffers: shared hit=9304
+  InitPlan 3
+    ->  Aggregate  (cost=1159.83..1159.84 rows=1 width=32) (actual time=1.459..1.460 rows=1.00 loops=1)
+          ->  CTE Scan on active_clients active_clients_1  (cost=0.00..1118.41 rows=16569 width=8) (actual time=1.459..1.459 rows=0.00 loops=1)
+                Filter: (first_order_date <= '2021-01-01'::date)
+                Rows Removed by Filter: 49998
+                Storage: Memory  Maximum Storage: 3971kB
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.212 ms
+Execution Time: 191.522 ms
+
+
+
+3.
+Result  (cost=59933.49..59933.50 rows=1 width=64) (actual time=237.463..237.487 rows=1.00 loops=1)
+  Buffers: shared hit=650451 read=1242
+  CTE active_clients
+    ->  Finalize HashAggregate  (cost=57116.74..57613.81 rows=49707 width=42) (actual time=226.122..229.079 rows=49998.00 loops=1)
+          Group Key: c.id
+          Batches: 1  Memory Usage: 5145kB
+          Buffers: shared hit=650451 read=1242
+          ->  Gather  (cost=47535.70..56482.97 rows=84502 width=42) (actual time=216.561..219.873 rows=49998.00 loops=1)
+                Workers Planned: 1
+                Workers Launched: 1
+                Buffers: shared hit=650451 read=1242
+                ->  Partial HashAggregate  (cost=46535.70..47032.77 rows=49707 width=42) (actual time=208.614..210.476 rows=24999.00 loops=2)
+                      Group Key: c.id
+                      Batches: 1  Memory Usage: 3097kB
+                      Buffers: shared hit=650451 read=1242
+                      Worker 0:  Batches: 1  Memory Usage: 3097kB
+                      ->  Nested Loop  (cost=561.95..44342.75 rows=292394 width=38) (actual time=2.228..192.299 rows=250043.00 loops=2)
+                            Buffers: shared hit=650451 read=1242
+                            ->  Parallel Bitmap Heap Scan on opt_clients c  (cost=561.52..2834.01 rows=29239 width=30) (actual time=1.774..5.247 rows=24999.00 loops=2)
+                                  Recheck Cond: ((status)::text = 'active'::text)
+                                  Heap Blocks: exact=962
+                                  Buffers: shared hit=1971
+                                  Worker 0:  Heap Blocks: exact=945
+                                  ->  Bitmap Index Scan on inx_opt_clients_status  (cost=0.00..549.10 rows=49707 width=0) (actual time=2.952..2.952 rows=49998.00 loops=1)
+                                        Index Cond: ((status)::text = 'active'::text)
+                                        Index Searches: 1
+                                        Buffers: shared hit=44
+                            ->  Index Scan using inx_opt_orders_clients_id on opt_orders o  (cost=0.42..1.31 rows=11 width=24) (actual time=0.003..0.007 rows=10.00 loops=49998)
+                                  Index Cond: (client_id = c.id)
+                                  Index Searches: 49998
+                                  Buffers: shared hit=648480 read=1242
+  InitPlan 2
+    ->  Aggregate  (cost=1159.83..1159.84 rows=1 width=32) (actual time=234.726..234.726 rows=1.00 loops=1)
+          Buffers: shared hit=650451 read=1242
+          ->  CTE Scan on active_clients  (cost=0.00..1118.41 rows=16569 width=8) (actual time=226.277..234.714 rows=36.00 loops=1)
+                Filter: (first_order_date >= '2025-01-01'::date)
+                Rows Removed by Filter: 49962
+                Storage: Memory  Maximum Storage: 3971kB
+                Buffers: shared hit=650451 read=1242
+  InitPlan 3
+    ->  Aggregate  (cost=1159.83..1159.84 rows=1 width=32) (actual time=2.731..2.731 rows=1.00 loops=1)
+          ->  CTE Scan on active_clients active_clients_1  (cost=0.00..1118.41 rows=16569 width=8) (actual time=0.000..2.081 rows=32595.00 loops=1)
+                Filter: (first_order_date <= '2022-01-01'::date)
+                Rows Removed by Filter: 17403
+                Storage: Memory  Maximum Storage: 3971kB
+Planning:
+  Buffers: shared hit=16
+Planning Time: 1.028 ms
+Execution Time: 238.824 ms
+
