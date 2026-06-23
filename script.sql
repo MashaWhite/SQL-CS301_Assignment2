@@ -125,6 +125,3 @@ select
 from new_active_clients),
 (select sum(orders_count) as old_clients_orders_count
 from old_active_clients)
-
-
-Execution Time: 238.824 ms
