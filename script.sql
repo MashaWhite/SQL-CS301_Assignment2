@@ -34,28 +34,40 @@ CREATE TABLE IF NOT EXISTS opt_orders (
         FOREIGN KEY (product_id) REFERENCES opt_products(product_id)
 );
 
---запит повертає кількість замовлень старих та нових клієнтів
+--запит повертає кількість замовлень старих та нових клієнтів на категорію продукту 5
 
 --нeоптимізований запит
+--видалимо спочатку індекс,щоб приповторному тестуванні, не він використовувався
+drop index if  exists inx_opt_orders_clients_id;
+drop index if  exists inx_opt_clients_status;
+drop index if  exists inx_opt_orders_order_date;
+
 
 explain analyze
 select 
-	(--сума замовлень
+	(
+	--сума замовлень
 	select sum(orders_count) as new_clients_orders_count
 	from 
 		--активні клієнти
-		(select * 
+		(
+		select * 
 		from 
-			(select  
+			(
+			select  
 				c.id, 
 				c.name, 
 				c.surname, 
-				count(o.order_id) as orders_count, 
+				--кількість замовлень одного клієнта
+				count(o.order_id) as orders_count,
+				--дата, коли було зроблено перше замовлення
 				min(o.order_date) as first_order_date
 			from opt_clients as c 
 			join opt_orders as o
 			on c.id = o.client_id
-			where c.status = 'active'
+			join opt_products as p
+			on p.product_id = o.order_id
+			where c.status = 'active' and p.product_category = 'Category5'
 			group by c.id, c.name, c.surname)
 		--нові клієнти
 		where first_order_date >= '2025-01-01')),
@@ -64,22 +76,30 @@ select
 	select sum(orders_count) as old_clients_orders_count
 	from 
 		--активні клієнти
-		(select * 
+		( 
+		select * 
 		from 
-			(select  
+			(
+			select  
 				c.id, 
 				c.name, 
 				c.surname, 
-				count(o.order_id) as orders_count, 
+				--кількість замовлень одного клієнта
+				count(o.order_id) as orders_count,
+				--дата, коли було зроблено перше замовлення
 				min(o.order_date) as first_order_date
 			from opt_clients as c 
 			join opt_orders as o
 			on c.id = o.client_id
-			where c.status = 'active'
+			join opt_products as p
+			on p.product_id = o.order_id
+			where c.status = 'active' and p.product_category = 'Category5'
 			group by c.id, c.name, c.surname)
 	--старі клієнти
 	where first_order_date <= '2022-01-01')
 	)
+
+
 
 --створбємо індекси для opt_orders(client_id), opt_clients(status), opt_orders(order_date)
 --тому, що потім фільтрація відбувається саме по цих значеннях
@@ -91,11 +111,11 @@ create index if not exists inx_opt_clients_status
 create index if not exists inx_opt_orders_order_date
 	on opt_orders(order_date);
 
---виконувала запит з цією командою і без неї - детальніше в файлі зі звітом про оптимізацію
+--цю команду тестувала - детальніше в фалйі з optimization.txt
 set enable_seqscan = off;
 explain analyze
 --cte, що повертає активних клієнтів
-with active_clients as(
+with filtered_clients as(
 	select  
 		c.id, 
 		c.name, 
@@ -107,21 +127,24 @@ with active_clients as(
 	from opt_clients as c 
 	join opt_orders as o
 	on c.id = o.client_id
-	where c.status = 'active'
+	join opt_products as p
+	on p.product_id = o.order_id
+	--статус активний і рахуємо саме замовлення продукту категорії 5
+	where c.status = 'active' and p.product_category = 'Category5'
 	group by c.id, c.name, c.surname),
 --старі клієнти - в яких перше замовлення було зроблено раніше за 2022-01-01
-old_active_clients as( 
+old_clients as( 
 	select * 
-	from active_clients
+	from filtered_clients
 	where first_order_date <= '2022-01-01'),
 -- нові - пізніше за 2025-01-01
-new_active_clients as(
+new_clients as(
 	select * 
-	from active_clients
+	from filtered_clients
 	where first_order_date >= '2025-01-01')
 --фінальний запит рахує суму всіх замовлень нових клієнтів і старих, виводить дві колонки і один рядок
 select 
 (select sum(orders_count) as new_clients_orders_count
-from new_active_clients),
+from new_clients),
 (select sum(orders_count) as old_clients_orders_count
-from old_active_clients)
+from old_clients)
