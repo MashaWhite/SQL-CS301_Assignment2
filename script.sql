@@ -38,9 +38,10 @@ CREATE TABLE IF NOT EXISTS opt_orders (
 
 --нeоптимізований запит
 --видалимо спочатку індекс,щоб приповторному тестуванні, не він використовувався
-drop index if  exists inx_opt_orders_clients_id;
-drop index if  exists inx_opt_clients_status;
-drop index if  exists inx_opt_orders_order_date;
+drop index if exists inx_opt_orders_clients_id;
+drop index if exists inx_opt_clients_status;
+drop index if exists inx_opt_orders_order_date;
+drop index if exists inx_opt_products_category;
 
 
 explain analyze
@@ -101,7 +102,7 @@ select
 
 
 
---створбємо індекси для opt_orders(client_id), opt_clients(status), opt_orders(order_date)
+--створбємо індекси для opt_orders(client_id), opt_clients(status), opt_orders(order_date),  opt_products(product_category)
 --тому, що потім фільтрація відбувається саме по цих значеннях
 
 create index if not exists inx_opt_orders_clients_id 
@@ -110,6 +111,8 @@ create index if not exists inx_opt_clients_status
 	on opt_clients(status);
 create index if not exists inx_opt_orders_order_date
 	on opt_orders(order_date);
+create index if not exists inx_opt_products_category
+	on opt_products(product_category);
 
 --цю команду тестувала - детальніше в фалйі з optimization.txt
 set enable_seqscan = off;
